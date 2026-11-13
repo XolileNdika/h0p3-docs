@@ -123,6 +123,7 @@ textarea{min-height:84px;resize:vertical}
 .pill.pending{background:#A9C23A44;color:#59680f}
 .pill.blocked{background:#B3402F1F;color:#8c2f21}
 .pill.owner{background:#9B6EC833;color:#6a3f98}
+.pill.tag{background:#4FB6DE26;color:#1f6f8f}
 
 /* footer */
 footer{background:var(--ink);color:#e9efe9;margin-top:auto}
@@ -303,6 +304,9 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
   </div>
 </footer>
 
+<dialog id="tagDlg"><form id="f-tag" novalidate><h3>Member tag</h3><p id="tagWho" style="margin:0 0 1rem;color:var(--ink-soft)"></p>
+  <div class="field"><label for="tag-in">Tag name</label><input id="tag-in" type="text" maxlength="40" list="taglist" placeholder="Volunteer, Board, Treasurer"><datalist id="taglist"></datalist><p class="hint">Leave it empty to remove the tag.</p></div>
+  <div class="row-end"><button class="btn ghost small" id="tagNo" type="button">Cancel</button><button class="btn small" id="tagYes" type="submit">Save tag</button></div></form></dialog>
 <dialog id="dlg"><h3 id="dlgTitle"></h3><p id="dlgText" style="margin:0;color:var(--ink-soft)"></p>
   <div class="row-end"><button class="btn ghost small" id="dlgNo" type="button">Cancel</button><button class="btn danger small" id="dlgYes" type="button">Delete</button></div></dialog>
 <div id="toast" class="hidden" role="status"></div>
@@ -519,13 +523,15 @@ async function refreshBadge(){
 async function loadPeople(){
   const {data,error}=await sb.from("profiles").select("*").order("created_at",{ascending:false});
   if(error)return toast(friendly(error));
-  const row=(p,btns)=>'<li class="member"><div><b>'+esc(p.full_name||p.email)+(p.is_admin?'<span class="pill owner">Founder</span>':"")+"</b><small>"+esc(p.email)+" · Joined "+dateText(p.created_at)+"</small></div><div style='display:flex;gap:.5rem;flex-wrap:wrap'>"+btns+"</div></li>";
+  const row=(p,btns)=>'<li class="member"><div><b>'+esc(p.full_name||p.email)+(p.is_admin?'<span class="pill owner">Founder</span>':"")+(p.tag?'<span class="pill tag">'+esc(p.tag)+"</span>":"")+"</b><small>"+esc(p.email)+" · Joined "+dateText(p.created_at)+"</small></div><div style='display:flex;gap:.5rem;flex-wrap:wrap'>"+btns+"</div></li>";
   const act=(id,s,label,cls)=>'<button class="btn '+cls+' small" data-p="'+id+'" data-s="'+s+'" type="button">'+label+"</button>";
   const by=s=>data.filter(p=>p.status===s);
   const fill=(el,list,fn,empty)=>{$(el).innerHTML=list.length?list.map(fn).join(""):'<li class="member"><small>'+empty+"</small></li>"};
-  fill("#listPending",by("pending"),p=>row(p,act(p.id,"approved","Approve","")+act(p.id,"blocked","Decline","danger")),"Nobody is waiting right now.");
-  fill("#listApproved",by("approved"),p=>row(p,p.id===me.id?"":act(p.id,"blocked","Remove access","danger")),"No approved members yet.");
-  fill("#listBlocked",by("blocked"),p=>row(p,act(p.id,"approved","Restore access","ghost")),"Nobody is blocked.");
+  people=data;
+  const tagBtn=p=>'<button class="btn ghost small" data-tag="'+esc(p.id)+'" type="button">'+(p.tag?"Edit tag":"Add tag")+"</button>";
+  fill("#listPending",by("pending"),p=>row(p,tagBtn(p)+act(p.id,"approved","Approve","")+act(p.id,"blocked","Decline","danger")),"Nobody is waiting right now.");
+  fill("#listApproved",by("approved"),p=>row(p,tagBtn(p)+(p.id===me.id?"":act(p.id,"blocked","Remove access","danger"))),"No approved members yet.");
+  fill("#listBlocked",by("blocked"),p=>row(p,tagBtn(p)+act(p.id,"approved","Restore access","ghost")),"Nobody is blocked.");
   const n=by("pending").length;const b=$("#pendBadge");b.textContent=n;b.classList.toggle("hidden",!n);
 }
 $("#p-people").addEventListener("click",async e=>{
@@ -536,6 +542,26 @@ $("#p-people").addEventListener("click",async e=>{
   toast(s==="approved"?"Access approved":"Access removed");loadPeople();
 });
 $("#b-refresh").onclick=loadPeople;
+
+/* ---------- member tags (founder) ---------- */
+let people=[];
+$("#p-people").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-tag]");if(!b)return;
+  const p=people.find(x=>String(x.id)===b.dataset.tag);if(!p)return;
+  $("#tagWho").textContent=p.full_name||p.email;$("#tag-in").value=p.tag||"";
+  $("#taglist").innerHTML=Array.from(new Set(people.map(x=>x.tag).filter(Boolean))).sort().map(t=>"<option>"+esc(t)+"</option>").join("");
+  const d=$("#tagDlg");d.dataset.id=p.id;d.showModal();$("#tag-in").focus();
+});
+$("#tagNo").onclick=()=>$("#tagDlg").close();
+$("#f-tag").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const d=$("#tagDlg"),v=$("#tag-in").value.trim().slice(0,40)||null,b=$("#tagYes");
+  busy(b,true,"Saving");
+  const {error}=await sb.from("profiles").update({tag:v}).eq("id",d.dataset.id);
+  busy(b,false);
+  if(error)return toast(/tag/i.test(error.message||"")?"Tags need a one-time setup step in Supabase first.":friendly(error));
+  d.close();toast(v?"Tag saved":"Tag removed");loadPeople();
+});
 
 /* ---------- start ---------- */
 sb.auth.onAuthStateChange((ev,session)=>{
