@@ -248,23 +248,24 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
     <div class="wrap">
       <div class="tabs" role="tablist" id="mainTabs">
         <button role="tab" id="tab-docs" aria-selected="true" type="button">Documents</button>
+        <button role="tab" id="tab-cvs" aria-selected="false" type="button">CVs</button>
         <button role="tab" id="tab-people" aria-selected="false" type="button" class="hidden">Members<span class="badge hidden" id="pendBadge">0</span></button>
       </div>
 
       <div id="p-docs">
         <div class="page-head">
-          <div><h2>Documents</h2><p id="docCount">Loading documents</p></div>
+          <div><h2 id="docHead">Documents</h2><p id="docCount">Loading documents</p></div>
         </div>
 
         <div id="uploadPanel" class="panel hidden">
-          <h3>Add a document</h3>
+          <h3 id="upHead">Add a document</h3>
           <div id="upMsg" role="status"></div>
           <form id="f-upload" novalidate>
             <div class="grid2">
               <div class="field"><label for="up-title">Title</label><input id="up-title" type="text" required placeholder="Volunteer handbook 2026"></div>
-              <div class="field"><label for="up-cat">Category</label>
+              <div class="field" id="catField"><label for="up-cat">Category</label>
                 <input id="up-cat" type="text" list="catlist" placeholder="Choose or type a category" required>
-                <datalist id="catlist"><option>General</option><option>Governance</option><option>Finance</option><option>Projects</option><option>Policies</option><option>Templates</option><option>Volunteers</option><option>Reports</option></datalist>
+                <datalist id="catlist"><option>General</option><option>Governance</option><option>Finance</option><option>Projects</option><option>Policies</option><option>Templates</option><option>Volunteers</option><option>Reports</option><option>CVs</option></datalist>
               </div>
             </div>
             <div class="field"><label for="up-desc">Short description (optional)</label><textarea id="up-desc"></textarea></div>
@@ -415,12 +416,23 @@ async function route(session){
 $("#b-check").onclick=async()=>{const {data}=await sb.auth.getSession();await route(data.session);if(me&&me.status==="pending")toast("Still waiting for approval")};
 
 /* ---------- home ---------- */
-function setTab(t){
-  tab=t;$("#tab-docs").setAttribute("aria-selected",t==="docs");$("#tab-people").setAttribute("aria-selected",t==="people");
-  $("#p-docs").classList.toggle("hidden",t!=="docs");$("#p-people").classList.toggle("hidden",t!=="people");
-  if(t==="people")loadPeople();
+const isCV=d=>/^cvs?$/i.test((d.category||"").trim());
+function applyTabText(){
+  const cv=tab==="cvs";
+  $("#docHead").textContent=cv?"CV documents":"Documents";
+  $("#upHead").textContent=cv?"Add a CV":"Add a document";
+  $("#catField").classList.toggle("hidden",cv);
+  $("#up-title").placeholder=cv?"Full name CV":"Volunteer handbook 2026";
+  $("#q").placeholder=cv?"Search CVs by name or description":"Search by title or description";
+  $("#up-btn").textContent=cv?"Upload CV":"Upload document";
+  note("#upMsg","","");
 }
-$("#tab-docs").onclick=()=>setTab("docs");$("#tab-people").onclick=()=>setTab("people");
+function setTab(t){
+  tab=t;["docs","cvs","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
+  $("#p-docs").classList.toggle("hidden",t==="people");$("#p-people").classList.toggle("hidden",t!=="people");
+  if(t==="people")loadPeople();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
+}
+$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-people").onclick=()=>setTab("people");
 async function enterHome(){
   show("home");$("#whoEmail").textContent=me.full_name||me.email;
   const admin=!!me.is_admin;
@@ -441,13 +453,14 @@ async function loadDocs(){
   docs=data||[];renderDocs();
 }
 function renderDocs(){
-  const cats=["All",...Array.from(new Set(docs.map(d=>d.category).filter(Boolean))).sort()];
+  const cv=tab==="cvs", pool=docs.filter(d=>isCV(d)===cv), noun=cv?"CVs":"documents";
+  const cats=cv?["All"]:["All",...Array.from(new Set(pool.map(d=>d.category).filter(Boolean))).sort()];
   if(!cats.includes(cat))cat="All";
   $("#chips").innerHTML=cats.length>2?cats.map(c=>'<button type="button" class="chip" aria-pressed="'+(c===cat)+'" data-c="'+esc(c)+'">'+esc(c)+"</button>").join(""):"";
   $("#chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{cat=b.dataset.c;renderDocs()});
   const q=$("#q").value.trim().toLowerCase();
-  const list=docs.filter(d=>(cat==="All"||d.category===cat)&&(!q||(d.title+" "+(d.description||"")).toLowerCase().includes(q)));
-  $("#docCount").textContent=docs.length?(list.length+" of "+docs.length+" documents"):"No documents yet";
+  const list=pool.filter(d=>(cat==="All"||d.category===cat)&&(!q||(d.title+" "+(d.description||"")).toLowerCase().includes(q)));
+  $("#docCount").textContent=pool.length?(list.length+" of "+pool.length+" "+noun):"No "+noun+" yet";
   $("#docList").innerHTML=list.map(d=>{const t=ftype(d.file_name||"");
     return '<li class="doc"><div class="ftype" style="background:'+t.color+'" aria-hidden="true">'+esc(t.label)+'</div>'+
     '<div><h3>'+esc(d.title)+'</h3>'+(d.description?'<p class="desc">'+esc(d.description)+'</p>':"")+
@@ -456,7 +469,7 @@ function renderDocs(){
     (me.is_admin?'<button class="btn danger small" data-del="'+d.id+'" type="button">Delete</button>':"")+"</div></li>"}).join("");
   const em=$("#docEmpty");
   if(!list.length){em.classList.remove("hidden");
-    em.innerHTML=docs.length?"<h3>Nothing matches</h3><p>Try a different word or choose All.</p>":(me.is_admin?"<h3>Add your first document</h3><p>Use the form above to upload a policy, report or template.</p>":"<h3>No documents yet</h3><p>The h0p3 team will add documents here soon.</p>");
+    em.innerHTML=pool.length?"<h3>Nothing matches</h3><p>Try a different word"+(cv?".":" or choose All.")+"</p>":cv?(me.is_admin?"<h3>Add your first CV</h3><p>Use the form above to upload a CV.</p>":"<h3>No CVs yet</h3><p>CVs added by the h0p3 team will appear here.</p>"):(me.is_admin?"<h3>Add your first document</h3><p>Use the form above to upload a policy, report or template.</p>":"<h3>No documents yet</h3><p>The h0p3 team will add documents here soon.</p>");
   }else em.classList.add("hidden");
 }
 $("#q").addEventListener("input",renderDocs);
@@ -482,7 +495,8 @@ $("#docList").addEventListener("click",async e=>{
 /* ---------- upload (founder) ---------- */
 $("#f-upload").addEventListener("submit",async e=>{
   e.preventDefault();note("#upMsg","","");
-  const title=$("#up-title").value.trim(),category=$("#up-cat").value.trim()||"General",description=$("#up-desc").value.trim(),f=$("#up-file").files[0];
+  const cvTab=tab==="cvs";
+  const title=$("#up-title").value.trim(),category=cvTab?"CVs":($("#up-cat").value.trim()||"General"),description=$("#up-desc").value.trim(),f=$("#up-file").files[0];
   if(!title)return note("#upMsg","err","Add a title for the document.");
   if(!f)return note("#upMsg","err","Choose a file to upload.");
   if(f.size>MAX)return note("#upMsg","err","That file is over 50 MB. Choose a smaller file.");
@@ -494,7 +508,7 @@ $("#f-upload").addEventListener("submit",async e=>{
   const ins=await sb.from("documents").insert({title,category,description,file_name:f.name,storage_path:path,size_bytes:f.size,mime_type:f.type||null,uploaded_by:me.id});
   busy(b,false);
   if(ins.error){await sb.storage.from(BUCKET).remove([path]);return note("#upMsg","err",friendly(ins.error))}
-  e.target.reset();toast("Document uploaded");loadDocs();
+  e.target.reset();toast(cvTab?"CV uploaded":"Document uploaded");loadDocs();
 });
 
 /* ---------- members (founder) ---------- */
