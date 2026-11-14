@@ -263,8 +263,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         <button role="tab" id="tab-cvs" aria-selected="false" type="button">CVs</button>
         <button role="tab" id="tab-team" aria-selected="false" type="button" class="hidden">Volunteers &amp; team</button>
         <button role="tab" id="tab-cipc" aria-selected="false" type="button" class="hidden">CIPC compliance</button>
-        <button role="tab" id="tab-drafts" aria-selected="false" type="button" class="hidden">Drafts<span class="badge hidden" id="draftBadge">0</span></button>
-        <button role="tab" id="tab-final" aria-selected="false" type="button" class="hidden">Finalised</button>
+        <button role="tab" id="tab-work" aria-selected="false" type="button" class="hidden">Drafts &amp; finalised<span class="badge hidden" id="draftBadge">0</span></button>
         <button role="tab" id="tab-people" aria-selected="false" type="button" class="hidden">Members<span class="badge hidden" id="pendBadge">0</span></button>
       </div>
 
@@ -360,8 +359,8 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
       </div>
 
       <div id="p-work" class="hidden">
-        <div class="page-head"><div><h2 id="workHead">Drafts</h2><p id="workCount">Loading</p></div><button class="btn small" id="b-addDraft" type="button">Add draft</button></div>
-        <p class="hint" id="workHint" style="margin:-.6rem 0 1.2rem"></p>
+        <div class="page-head"><div><h2 id="workHead">Drafts &amp; finalised</h2><p id="workCount">Loading</p></div><button class="btn small" id="b-addDraft" type="button">Add draft</button></div>
+        <p class="hint" id="workHint" style="margin:-.6rem 0 1.2rem">Work in progress sits under Drafts. When a document is done, use Mark as final and it moves down to Finalised. Only the founder can see this tab.</p>
 
         <div id="draftPanel" class="panel hidden">
           <h3>Add a draft</h3>
@@ -378,7 +377,8 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         </div>
 
         <div class="tools"><div><label class="sr" for="wq">Search</label><input id="wq" type="search" placeholder="Search by title, category or notes"></div></div>
-        <ul class="docs" id="workList"></ul>
+        <div id="workDraftWrap" class="hidden"><h3 class="sub">Drafts</h3><ul class="docs" id="workDrafts"></ul></div>
+        <div id="workFinalWrap" class="hidden"><h3 class="sub">Finalised</h3><ul class="docs" id="workFinal"></ul></div>
         <div id="workEmpty" class="empty hidden"></div>
       </div>
 
@@ -535,16 +535,16 @@ function applyTabText(){
   note("#upMsg","","");
 }
 function setTab(t){
-  tab=t;["docs","cvs","team","cipc","drafts","final","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
-  const work=t==="drafts"||t==="final";$("#p-work").classList.toggle("hidden",!work);
+  tab=t;["docs","cvs","team","cipc","work","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
+  const work=t==="work";$("#p-work").classList.toggle("hidden",!work);
   $("#p-docs").classList.toggle("hidden",t==="people"||t==="team"||t==="cipc"||work);$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");$("#p-cipc").classList.toggle("hidden",t!=="cipc");
   if(t==="people")loadPeople();else if(t==="team")loadTeam();else if(t==="cipc")loadCipc();else if(work)loadWork();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
 }
-$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-drafts").onclick=()=>setTab("drafts");$("#tab-final").onclick=()=>setTab("final");$("#tab-people").onclick=()=>setTab("people");
+$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-work").onclick=()=>setTab("work");$("#tab-people").onclick=()=>setTab("people");
 async function enterHome(){
   show("home");$("#whoEmail").textContent=me.full_name||me.email;
   const admin=!!me.is_admin;
-  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#tab-cipc").classList.toggle("hidden",!admin);$("#tab-drafts").classList.toggle("hidden",!admin);$("#tab-final").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
+  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#tab-cipc").classList.toggle("hidden",!admin);$("#tab-work").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
   setTab("docs");await loadDocs();if(admin){refreshBadge();loadWork(true)}
 }
 
@@ -855,7 +855,7 @@ async function loadWork(quiet){
   const {data,error}=await sb.from("work_docs").select("*").order("updated_at",{ascending:false});
   work=error?[]:(data||[]);
   const n=work.filter(w=>w.status!=="final").length,b=$("#draftBadge");b.textContent=n;b.classList.toggle("hidden",!n);
-  if(quiet&&tab!=="drafts"&&tab!=="final")return;
+  if(quiet&&tab!=="work")return;
   renderWork();
   if(error)$("#workCount").textContent=workSetup(error)?"This tab needs a one-time setup step in Supabase.":"Could not load. "+friendly(error);
 }
@@ -871,17 +871,17 @@ function workRow(w){
     '<button class="btn danger small" data-wx="'+esc(w.id)+'" type="button">Delete</button></div></li>';
 }
 function renderWork(){
-  const fin=tab==="final",pool=work.filter(w=>(w.status==="final")===fin);
-  $("#workHead").textContent=fin?"Finalised":"Drafts";
-  $("#workHint").textContent=fin?"Finished, signed or approved versions. Only the founder can see this tab.":"Work in progress. When a document is done, use Mark as final and it moves to Finalised. Only the founder can see this tab.";
-  $("#b-addDraft").classList.toggle("hidden",fin);if(fin)$("#draftPanel").classList.add("hidden");
   const q=$("#wq").value.trim().toLowerCase();
-  const list=pool.filter(w=>!q||(w.title+" "+(w.category||"")+" "+(w.notes||"")).toLowerCase().includes(q));
-  const noun=fin?"final documents":"drafts";
-  $("#workCount").textContent=pool.length?(list.length+" of "+pool.length+" "+noun):"No "+noun+" yet";
-  $("#workList").innerHTML=list.map(workRow).join("");
-  const em=$("#workEmpty");em.classList.toggle("hidden",!!list.length);
-  em.innerHTML=pool.length?"<h3>Nothing matches</h3><p>Try a different word.</p>":fin?"<h3>Nothing finalised yet</h3><p>Documents you mark as final in Drafts appear here.</p>":"<h3>Add your first draft</h3><p>Use Add draft to save a document you are still working on.</p>";
+  const hit=w=>!q||(w.title+" "+(w.category||"")+" "+(w.notes||"")).toLowerCase().includes(q);
+  const drafts=work.filter(w=>w.status!=="final"&&hit(w)),fins=work.filter(w=>w.status==="final"&&hit(w));
+  const nd=work.filter(w=>w.status!=="final").length,nf=work.length-nd;
+  $("#workCount").textContent=work.length?(nd+(nd===1?" draft":" drafts")+" · "+nf+" finalised"+(q?" · "+(drafts.length+fins.length)+" match":"")):"Nothing added yet";
+  $("#workDrafts").innerHTML=drafts.map(workRow).join("");
+  $("#workFinal").innerHTML=fins.map(workRow).join("");
+  $("#workDraftWrap").classList.toggle("hidden",!drafts.length);
+  $("#workFinalWrap").classList.toggle("hidden",!fins.length);
+  const em=$("#workEmpty"),none=!drafts.length&&!fins.length;em.classList.toggle("hidden",!none);
+  em.innerHTML=work.length?"<h3>Nothing matches</h3><p>Try a different word.</p>":"<h3>Add your first draft</h3><p>Use Add draft to save a document you are still working on. When it is done, mark it as final.</p>";
 }
 $("#wq").addEventListener("input",renderWork);
 $("#b-addDraft").onclick=()=>{note("#draftMsg","","");$("#draftPanel").classList.remove("hidden");$("#dr-title").focus()};
