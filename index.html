@@ -263,6 +263,8 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         <button role="tab" id="tab-cvs" aria-selected="false" type="button">CVs</button>
         <button role="tab" id="tab-team" aria-selected="false" type="button" class="hidden">Volunteers &amp; team</button>
         <button role="tab" id="tab-cipc" aria-selected="false" type="button" class="hidden">CIPC compliance</button>
+        <button role="tab" id="tab-drafts" aria-selected="false" type="button" class="hidden">Drafts<span class="badge hidden" id="draftBadge">0</span></button>
+        <button role="tab" id="tab-final" aria-selected="false" type="button" class="hidden">Finalised</button>
         <button role="tab" id="tab-people" aria-selected="false" type="button" class="hidden">Members<span class="badge hidden" id="pendBadge">0</span></button>
       </div>
 
@@ -357,6 +359,29 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         <div id="cipcEmpty" class="empty hidden"><h3>Add your first CIPC item</h3><p>Use Add item, then upload its PDF.</p></div>
       </div>
 
+      <div id="p-work" class="hidden">
+        <div class="page-head"><div><h2 id="workHead">Drafts</h2><p id="workCount">Loading</p></div><button class="btn small" id="b-addDraft" type="button">Add draft</button></div>
+        <p class="hint" id="workHint" style="margin:-.6rem 0 1.2rem"></p>
+
+        <div id="draftPanel" class="panel hidden">
+          <h3>Add a draft</h3>
+          <div id="draftMsg" role="status"></div>
+          <form id="f-draft" novalidate>
+            <div class="grid2">
+              <div class="field"><label for="dr-title">Title</label><input id="dr-title" type="text" required placeholder="Notice to director"></div>
+              <div class="field"><label for="dr-cat">Category</label><input id="dr-cat" type="text" list="catlist" placeholder="Governance"></div>
+            </div>
+            <div class="field"><label for="dr-notes">Notes (optional)</label><textarea id="dr-notes" placeholder="What still needs to happen before this is final"></textarea></div>
+            <div class="field"><label for="dr-file">File</label><input id="dr-file" type="file" required><p class="hint">Up to 50 MB. Word, PDF, Excel and more.</p></div>
+            <div class="row-start"><button class="btn" type="submit" id="dr-save">Save draft</button><button class="btn ghost" type="button" id="dr-cancel">Cancel</button></div>
+          </form>
+        </div>
+
+        <div class="tools"><div><label class="sr" for="wq">Search</label><input id="wq" type="search" placeholder="Search by title, category or notes"></div></div>
+        <ul class="docs" id="workList"></ul>
+        <div id="workEmpty" class="empty hidden"></div>
+      </div>
+
       <div id="p-people" class="hidden">
         <div class="page-head"><div><h2>Members</h2><p>Approve the people who may open h0p3 documents.</p></div><button class="btn ghost small" id="b-refresh" type="button">Refresh</button></div>
         <div class="panel"><h3>Waiting for approval</h3><ul class="members" id="listPending"></ul></div>
@@ -383,6 +408,10 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
   <div class="row-end"><button class="btn ghost small" id="tagNo" type="button">Cancel</button><button class="btn small" id="tagYes" type="submit">Save tag</button></div></form></dialog>
 <dialog id="dlg"><h3 id="dlgTitle"></h3><p id="dlgText" style="margin:0;color:var(--ink-soft)"></p>
   <div class="row-end"><button class="btn ghost small" id="dlgNo" type="button">Cancel</button><button class="btn danger small" id="dlgYes" type="button">Delete</button></div></dialog>
+<dialog id="finDlg"><form id="f-fin" novalidate><h3>Mark as final</h3><p id="finWho" style="margin:0 0 1rem;color:var(--ink-soft)"></p>
+  <div class="field"><label for="fin-file">Final version (optional)</label><input id="fin-file" type="file"><p class="hint">Add the signed or final copy if you have one. Leave it empty to keep the current file as the final version. The draft file is kept as a record.</p></div>
+  <div id="finMsg" role="status"></div>
+  <div class="row-end"><button class="btn ghost small" id="finNo" type="button">Cancel</button><button class="btn small" id="finYes" type="submit">Move to Finalised</button></div></form></dialog>
 <div id="toast" class="hidden" role="status"></div>
 
 <script src="config.js"></script>
@@ -506,16 +535,17 @@ function applyTabText(){
   note("#upMsg","","");
 }
 function setTab(t){
-  tab=t;["docs","cvs","team","cipc","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
-  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team"||t==="cipc");$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");$("#p-cipc").classList.toggle("hidden",t!=="cipc");
-  if(t==="people")loadPeople();else if(t==="team")loadTeam();else if(t==="cipc")loadCipc();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
+  tab=t;["docs","cvs","team","cipc","drafts","final","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
+  const work=t==="drafts"||t==="final";$("#p-work").classList.toggle("hidden",!work);
+  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team"||t==="cipc"||work);$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");$("#p-cipc").classList.toggle("hidden",t!=="cipc");
+  if(t==="people")loadPeople();else if(t==="team")loadTeam();else if(t==="cipc")loadCipc();else if(work)loadWork();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
 }
-$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-people").onclick=()=>setTab("people");
+$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-drafts").onclick=()=>setTab("drafts");$("#tab-final").onclick=()=>setTab("final");$("#tab-people").onclick=()=>setTab("people");
 async function enterHome(){
   show("home");$("#whoEmail").textContent=me.full_name||me.email;
   const admin=!!me.is_admin;
-  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#tab-cipc").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
-  setTab("docs");await loadDocs();if(admin)refreshBadge();
+  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#tab-cipc").classList.toggle("hidden",!admin);$("#tab-drafts").classList.toggle("hidden",!admin);$("#tab-final").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
+  setTab("docs");await loadDocs();if(admin){refreshBadge();loadWork(true)}
 }
 
 const sizeText=n=>n>=1048576?(n/1048576).toFixed(1)+" MB":Math.max(1,Math.round(n/1024))+" KB";
@@ -814,6 +844,127 @@ $("#p-cipc").addEventListener("click",async e=>{
   if(error){if(w)w.close();return toast(friendly(error))}
   if(dl){const a=document.createElement("a");a.href=data.signedUrl;a.download=c.file_name;document.body.appendChild(a);a.click();a.remove()}
   else if(w)w.location.href=data.signedUrl;else location.href=data.signedUrl;
+});
+
+/* ---------- drafts and finalised (founder) ---------- */
+const WORK_BUCKET="h0p3-drafts";
+let work=[], finId=null;
+const workSetup=e=>/does not exist|schema cache|relation|work_docs/i.test((e&&e.message)||"");
+const newPath=(id,name)=>id+"/"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2))+"-"+name.replace(/[^\w.\- ]+/g,"_").replace(/\s+/g,"_");
+async function loadWork(quiet){
+  const {data,error}=await sb.from("work_docs").select("*").order("updated_at",{ascending:false});
+  work=error?[]:(data||[]);
+  const n=work.filter(w=>w.status!=="final").length,b=$("#draftBadge");b.textContent=n;b.classList.toggle("hidden",!n);
+  if(quiet&&tab!=="drafts"&&tab!=="final")return;
+  renderWork();
+  if(error)$("#workCount").textContent=workSetup(error)?"This tab needs a one-time setup step in Supabase.":"Could not load. "+friendly(error);
+}
+function workRow(w){
+  const fin=w.status==="final",t=ftype(w.file_name||"");
+  const meta=[w.category,w.size_bytes?sizeText(w.size_bytes):"",fin&&w.finalised_at?"Finalised "+dateText(w.finalised_at):"Updated "+dateText(w.updated_at||w.created_at)].filter(Boolean).join(" · ");
+  return '<li class="doc"><div class="ftype" style="background:'+t.color+'" aria-hidden="true">'+esc(t.label)+"</div>"+
+    "<div><h3>"+esc(w.title)+'<span class="pill '+(fin?"approved":"pending")+'">'+(fin?"Final":"Draft")+"</span></h3>"+
+    (w.notes?'<p class="desc">'+esc(w.notes)+"</p>":"")+'<p class="meta">'+esc(meta)+"</p></div>"+
+    '<div class="acts"><button class="btn small" data-wo="'+esc(w.id)+'" type="button">Open</button><button class="btn ghost small" data-wd="'+esc(w.id)+'" type="button">Download</button>'+
+    (fin?(w.draft_storage_path?'<button class="btn ghost small" data-wdo="'+esc(w.id)+'" type="button">Open draft</button>':"")+'<button class="btn ghost small" data-wr="'+esc(w.id)+'" type="button">Back to drafts</button>'
+        :'<label class="btn ghost small">Replace file<input class="sr" type="file" data-wu="'+esc(w.id)+'" aria-label="Replace file for '+esc(w.title)+'"></label><button class="btn small" data-wf="'+esc(w.id)+'" type="button">Mark as final</button>')+
+    '<button class="btn danger small" data-wx="'+esc(w.id)+'" type="button">Delete</button></div></li>';
+}
+function renderWork(){
+  const fin=tab==="final",pool=work.filter(w=>(w.status==="final")===fin);
+  $("#workHead").textContent=fin?"Finalised":"Drafts";
+  $("#workHint").textContent=fin?"Finished, signed or approved versions. Only the founder can see this tab.":"Work in progress. When a document is done, use Mark as final and it moves to Finalised. Only the founder can see this tab.";
+  $("#b-addDraft").classList.toggle("hidden",fin);if(fin)$("#draftPanel").classList.add("hidden");
+  const q=$("#wq").value.trim().toLowerCase();
+  const list=pool.filter(w=>!q||(w.title+" "+(w.category||"")+" "+(w.notes||"")).toLowerCase().includes(q));
+  const noun=fin?"final documents":"drafts";
+  $("#workCount").textContent=pool.length?(list.length+" of "+pool.length+" "+noun):"No "+noun+" yet";
+  $("#workList").innerHTML=list.map(workRow).join("");
+  const em=$("#workEmpty");em.classList.toggle("hidden",!!list.length);
+  em.innerHTML=pool.length?"<h3>Nothing matches</h3><p>Try a different word.</p>":fin?"<h3>Nothing finalised yet</h3><p>Documents you mark as final in Drafts appear here.</p>":"<h3>Add your first draft</h3><p>Use Add draft to save a document you are still working on.</p>";
+}
+$("#wq").addEventListener("input",renderWork);
+$("#b-addDraft").onclick=()=>{note("#draftMsg","","");$("#draftPanel").classList.remove("hidden");$("#dr-title").focus()};
+$("#dr-cancel").onclick=()=>{$("#draftPanel").classList.add("hidden");$("#f-draft").reset()};
+$("#f-draft").addEventListener("submit",async e=>{
+  e.preventDefault();note("#draftMsg","","");
+  const title=$("#dr-title").value.trim(),category=$("#dr-cat").value.trim()||null,notes=$("#dr-notes").value.trim()||null,f=$("#dr-file").files[0];
+  if(!title)return note("#draftMsg","err","Add a title for the draft.");
+  if(!f)return note("#draftMsg","err","Choose a file to upload.");
+  if(f.size>MAX)return note("#draftMsg","err","That file is over 50 MB. Choose a smaller file.");
+  const b=$("#dr-save");busy(b,true,"Saving");
+  const ins=await sb.from("work_docs").insert({title,category,notes,status:"draft"}).select().single();
+  if(ins.error){busy(b,false);return note("#draftMsg","err",workSetup(ins.error)?"This tab needs a one-time setup step in Supabase first.":friendly(ins.error))}
+  const path=newPath(ins.data.id,f.name);
+  const up=await sb.storage.from(WORK_BUCKET).upload(path,f,{contentType:f.type||"application/octet-stream",upsert:false});
+  if(up.error){await sb.from("work_docs").delete().eq("id",ins.data.id);busy(b,false);return note("#draftMsg","err",friendly(up.error))}
+  const r=await sb.from("work_docs").update({file_name:f.name,storage_path:path,size_bytes:f.size,mime_type:f.type||null,updated_at:new Date().toISOString()}).eq("id",ins.data.id);
+  busy(b,false);
+  if(r.error)return note("#draftMsg","err",friendly(r.error));
+  $("#f-draft").reset();$("#draftPanel").classList.add("hidden");toast("Draft saved");loadWork();
+});
+$("#p-work").addEventListener("change",async e=>{
+  const inp=e.target.closest("input[data-wu]");if(!inp||!inp.files[0])return;
+  const w=work.find(x=>String(x.id)===inp.dataset.wu),f=inp.files[0];inp.value="";if(!w)return;
+  if(f.size>MAX)return toast("That file is over 50 MB.");
+  toast("Uploading "+f.name);
+  const path=newPath(w.id,f.name);
+  const up=await sb.storage.from(WORK_BUCKET).upload(path,f,{contentType:f.type||"application/octet-stream",upsert:false});
+  if(up.error)return toast(friendly(up.error));
+  const r=await sb.from("work_docs").update({file_name:f.name,storage_path:path,size_bytes:f.size,mime_type:f.type||null,updated_at:new Date().toISOString()}).eq("id",w.id);
+  if(r.error){await sb.storage.from(WORK_BUCKET).remove([path]);return toast(friendly(r.error))}
+  if(w.storage_path)await sb.storage.from(WORK_BUCKET).remove([w.storage_path]);
+  toast("New version saved");loadWork();
+});
+async function openWork(path,name,dl){
+  let win=null;if(!dl)win=window.open("","_blank");
+  const {data,error}=await sb.storage.from(WORK_BUCKET).createSignedUrl(path,120,dl?{download:name}:undefined);
+  if(error){if(win)win.close();return toast(friendly(error))}
+  if(dl){const a=document.createElement("a");a.href=data.signedUrl;a.download=name;document.body.appendChild(a);a.click();a.remove()}
+  else if(win)win.location.href=data.signedUrl;else location.href=data.signedUrl;
+}
+$("#p-work").addEventListener("click",async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const d=b.dataset,id=d.wo||d.wd||d.wdo||d.wf||d.wr||d.wx;if(!id)return;
+  const w=work.find(x=>String(x.id)===id);if(!w)return;
+  if(d.wo||d.wd){if(!w.storage_path)return toast("No file on this item yet.");return openWork(w.storage_path,w.file_name,!!d.wd)}
+  if(d.wdo)return openWork(w.draft_storage_path,w.draft_file_name,false);
+  if(d.wf){finId=w.id;$("#finWho").textContent=w.title;$("#f-fin").reset();note("#finMsg","","");$("#finDlg").showModal();return}
+  if(d.wr){
+    if(!await confirmBox("Move back to Drafts?",'"'+w.title+'" will move back to Drafts so you can keep working on it.',"Move back"))return;
+    const r=await sb.from("work_docs").update({status:"draft",finalised_at:null,updated_at:new Date().toISOString()}).eq("id",w.id);
+    if(r.error)return toast(friendly(r.error));
+    toast("Moved back to Drafts");return loadWork();
+  }
+  if(d.wx){
+    if(!await confirmBox("Delete this document?",'"'+w.title+'" and its files will be removed. This cannot be undone.'))return;
+    const paths=[w.storage_path,w.draft_storage_path].filter(Boolean);
+    if(paths.length){const r1=await sb.storage.from(WORK_BUCKET).remove(paths);if(r1.error)return toast(friendly(r1.error))}
+    const r2=await sb.from("work_docs").delete().eq("id",w.id);
+    if(r2.error)return toast(friendly(r2.error));
+    toast("Deleted");return loadWork();
+  }
+});
+$("#finNo").onclick=()=>$("#finDlg").close();
+$("#f-fin").addEventListener("submit",async e=>{
+  e.preventDefault();note("#finMsg","","");
+  const w=work.find(x=>String(x.id)===String(finId));if(!w)return $("#finDlg").close();
+  const f=$("#fin-file").files[0],b=$("#finYes");
+  if(f&&f.size>MAX)return note("#finMsg","err","That file is over 50 MB.");
+  busy(b,true,"Saving");
+  const r={status:"final",finalised_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  let path=null;
+  if(f){
+    path=newPath(w.id,f.name);
+    const up=await sb.storage.from(WORK_BUCKET).upload(path,f,{contentType:f.type||"application/octet-stream",upsert:false});
+    if(up.error){busy(b,false);return note("#finMsg","err",friendly(up.error))}
+    Object.assign(r,{file_name:f.name,storage_path:path,size_bytes:f.size,mime_type:f.type||null,draft_file_name:w.file_name,draft_storage_path:w.storage_path});
+  }
+  const res=await sb.from("work_docs").update(r).eq("id",w.id);
+  busy(b,false);
+  if(res.error){if(path)await sb.storage.from(WORK_BUCKET).remove([path]);return note("#finMsg","err",friendly(res.error))}
+  if(f&&w.draft_storage_path)await sb.storage.from(WORK_BUCKET).remove([w.draft_storage_path]);
+  $("#finDlg").close();toast("Moved to Finalised");loadWork();
 });
 
 /* ---------- start ---------- */
