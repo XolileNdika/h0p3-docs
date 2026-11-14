@@ -124,6 +124,16 @@ textarea{min-height:84px;resize:vertical}
 .pill.blocked{background:#B3402F1F;color:#8c2f21}
 .pill.owner{background:#9B6EC833;color:#6a3f98}
 .pill.tag{background:#4FB6DE26;color:#1f6f8f}
+input[type=date],input[type=tel],input[type=number]{width:100%;padding:.7rem .85rem;border:2px solid var(--line);border-radius:10px;background:#fff;min-height:46px}
+.avatar{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;color:#fff;font-family:var(--head);font-weight:800;font-size:1rem}
+.pill.vol{background:#A9C23A44;color:#59680f}
+.pill.team{background:#4FB6DE26;color:#1f6f8f}
+.pdl{grid-column:1/-1;display:grid;gap:.7rem 1.4rem;margin:0;padding:1rem 1.1rem;background:var(--paper);border:1px solid var(--line);border-radius:10px}
+@media(min-width:700px){.pdl{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pdl dt{font-size:.78rem;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.05em}
+.pdl dd{margin:.15rem 0 0;overflow-wrap:anywhere;white-space:pre-line}
+.pdl .wide{grid-column:1/-1}
+.row-start{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
 
 /* footer */
 footer{background:var(--ink);color:#e9efe9;margin-top:auto}
@@ -250,6 +260,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
       <div class="tabs" role="tablist" id="mainTabs">
         <button role="tab" id="tab-docs" aria-selected="true" type="button">Documents</button>
         <button role="tab" id="tab-cvs" aria-selected="false" type="button">CVs</button>
+        <button role="tab" id="tab-team" aria-selected="false" type="button" class="hidden">Volunteers &amp; team</button>
         <button role="tab" id="tab-people" aria-selected="false" type="button" class="hidden">Members<span class="badge hidden" id="pendBadge">0</span></button>
       </div>
 
@@ -281,6 +292,40 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         </div>
         <ul class="docs" id="docList"></ul>
         <div id="docEmpty" class="empty hidden"></div>
+      </div>
+
+      <div id="p-team" class="hidden">
+        <div class="page-head"><div><h2>Volunteers &amp; team</h2><p id="teamCount">Loading</p></div><button class="btn small" id="b-addPerson" type="button">Add person</button></div>
+
+        <div id="personPanel" class="panel hidden">
+          <h3 id="personHead">Add a person</h3>
+          <div id="personMsg" role="status"></div>
+          <form id="f-person" novalidate>
+            <div class="grid2">
+              <div class="field"><label for="pe-name">Full name</label><input id="pe-name" type="text" autocomplete="off" required></div>
+              <div class="field"><label for="pe-type">Joined as</label><select id="pe-type"><option>Volunteer</option><option>Team</option></select></div>
+              <div class="field"><label for="pe-role">Role or position (optional)</label><input id="pe-role" type="text" placeholder="Initiative Coordinator"></div>
+              <div class="field"><label for="pe-date">Date joined</label><input id="pe-date" type="date"></div>
+              <div class="field"><label for="pe-email">Email</label><input id="pe-email" type="email" autocomplete="off"></div>
+              <div class="field"><label for="pe-phone">Phone / WhatsApp</label><input id="pe-phone" type="tel" autocomplete="off"></div>
+              <div class="field"><label for="pe-area">Area / suburb</label><input id="pe-area" type="text"></div>
+              <div class="field"><label for="pe-age">Age</label><input id="pe-age" type="number" min="10" max="120"></div>
+              <div class="field"><label for="pe-status">Status</label><select id="pe-status"><option>Active</option><option>On hold</option><option>Left</option></select></div>
+              <div class="field"><label for="pe-cv">CV (from the CVs tab)</label><select id="pe-cv"></select></div>
+            </div>
+            <div class="field"><label for="pe-avail">Availability</label><input id="pe-avail" type="text" placeholder="Saturdays, weekday evenings"></div>
+            <div class="field"><label for="pe-why">Why they joined</label><textarea id="pe-why"></textarea></div>
+            <div class="field"><label for="pe-notes">Notes</label><textarea id="pe-notes"></textarea><p class="hint">Do not record ID numbers here.</p></div>
+            <div class="row-start"><button class="btn" type="submit" id="pe-save">Add person</button><button class="btn ghost" type="button" id="pe-cancel">Cancel</button></div>
+          </form>
+        </div>
+
+        <div class="tools">
+          <div><label class="sr" for="tq">Search people</label><input id="tq" type="search" placeholder="Search by name, role, area, email or phone"></div>
+          <div class="chips" id="teamChips" role="group" aria-label="Filter by type"></div>
+        </div>
+        <ul class="docs" id="teamList"></ul>
+        <div id="teamEmpty" class="empty hidden"></div>
       </div>
 
       <div id="p-people" class="hidden">
@@ -432,15 +477,15 @@ function applyTabText(){
   note("#upMsg","","");
 }
 function setTab(t){
-  tab=t;["docs","cvs","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
-  $("#p-docs").classList.toggle("hidden",t==="people");$("#p-people").classList.toggle("hidden",t!=="people");
-  if(t==="people")loadPeople();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
+  tab=t;["docs","cvs","team","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
+  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team");$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");
+  if(t==="people")loadPeople();else if(t==="team")loadTeam();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
 }
-$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-people").onclick=()=>setTab("people");
+$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-people").onclick=()=>setTab("people");
 async function enterHome(){
   show("home");$("#whoEmail").textContent=me.full_name||me.email;
   const admin=!!me.is_admin;
-  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
+  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
   setTab("docs");await loadDocs();if(admin)refreshBadge();
 }
 
@@ -561,6 +606,92 @@ $("#f-tag").addEventListener("submit",async e=>{
   busy(b,false);
   if(error)return toast(/tag/i.test(error.message||"")?"Tags need a one-time setup step in Supabase first.":friendly(error));
   d.close();toast(v?"Tag saved":"Tag removed");loadPeople();
+});
+
+/* ---------- volunteers & team register (founder) ---------- */
+let persons=[], pType="All", editingId=null;
+const PFIELDS=[["full_name","pe-name"],["joined_as","pe-type"],["role","pe-role"],["joined_on","pe-date"],["email","pe-email"],["phone","pe-phone"],["area","pe-area"],["age","pe-age"],["status","pe-status"],["cv_document_id","pe-cv"],["availability","pe-avail"],["motivation","pe-why"],["notes","pe-notes"]];
+const needsSetup=e=>/does not exist|schema cache|relation|people/i.test((e&&e.message)||"");
+const initials=n=>String(n||"?").trim().split(/\s+/).slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
+async function loadTeam(){
+  const {data,error}=await sb.from("people").select("*").order("full_name",{ascending:true});
+  persons=error?[]:(data||[]).slice().sort((a,b)=>String(a.full_name).localeCompare(String(b.full_name)));
+  renderTeam();
+  if(error)$("#teamCount").textContent=needsSetup(error)?"This list needs a one-time setup step in Supabase.":"The list could not load. "+friendly(error);
+}
+function renderTeam(){
+  const types=[["All","All"],["Volunteer","Volunteers"],["Team","Team"]];
+  $("#teamChips").innerHTML=types.map(([v,l])=>'<button type="button" class="chip" aria-pressed="'+(v===pType)+'" data-t="'+v+'">'+l+"</button>").join("");
+  $("#teamChips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{pType=b.dataset.t;renderTeam()});
+  const q=$("#tq").value.trim().toLowerCase();
+  const list=persons.filter(p=>(pType==="All"||p.joined_as===pType)&&(!q||[p.full_name,p.role,p.area,p.email,p.phone].join(" ").toLowerCase().includes(q)));
+  const nv=persons.filter(p=>p.joined_as!=="Team").length, nt=persons.length-nv;
+  $("#teamCount").textContent=persons.length?(persons.length+(persons.length===1?" person":" people")+" · "+nv+" volunteer"+(nv===1?"":"s")+" · "+nt+" team"):"Nobody added yet";
+  const row=(k,v,wide)=>(v||v===0)?'<div'+(wide?' class="wide"':"")+"><dt>"+k+"</dt><dd>"+esc(v)+"</dd></div>":"";
+  const link=(k,v,href)=>v?"<div><dt>"+k+'</dt><dd><a href="'+href+'">'+esc(v)+"</a></dd></div>":"";
+  $("#teamList").innerHTML=list.map(p=>{
+    const team=p.joined_as==="Team";
+    const cv=p.cv_document_id?docs.find(d=>String(d.id)===String(p.cv_document_id)):null;
+    const st=p.status&&p.status!=="Active"?'<span class="pill '+(p.status==="Left"?"blocked":"pending")+'">'+esc(p.status)+"</span>":"";
+    return '<li class="doc"><div class="avatar" style="background:'+(team?"var(--blue)":"var(--green)")+'" aria-hidden="true">'+esc(initials(p.full_name))+"</div>"+
+      "<div><h3>"+esc(p.full_name)+'<span class="pill '+(team?"team":"vol")+'">'+(team?"Team":"Volunteer")+"</span>"+st+"</h3>"+
+      '<p class="desc">'+esc([p.role,p.area].filter(Boolean).join(" · ")||"No role set yet")+"</p>"+
+      '<p class="meta">'+(p.joined_on?"Joined "+dateText(p.joined_on):"Added "+dateText(p.created_at))+"</p></div>"+
+      '<div class="acts"><button class="btn small" data-pd="'+esc(p.id)+'" aria-expanded="false" type="button">Details</button><button class="btn ghost small" data-pe="'+esc(p.id)+'" type="button">Edit</button><button class="btn danger small" data-px="'+esc(p.id)+'" type="button">Remove</button></div>'+
+      '<dl class="pdl hidden" id="pd-'+esc(p.id)+'">'+
+        row("Full name",p.full_name)+row("Joined as",team?"Team":"Volunteer")+row("Role or position",p.role)+row("Status",p.status||"Active")+
+        row("Date joined",p.joined_on?dateText(p.joined_on):"")+link("Email",p.email,"mailto:"+esc(p.email))+link("Phone / WhatsApp",p.phone,"tel:"+esc(String(p.phone||"").replace(/[^\d+]/g,"")))+
+        row("Area / suburb",p.area)+row("Age",p.age)+row("Availability",p.availability,1)+row("Why they joined",p.motivation,1)+row("Notes",p.notes,1)+
+        (cv?'<div class="wide"><dt>CV</dt><dd><button class="btn ghost small" data-cv="'+esc(cv.id)+'" type="button">Open '+esc(cv.title)+"</button></dd></div>":"")+
+      "</dl></li>"}).join("");
+  const em=$("#teamEmpty");
+  if(!list.length){em.classList.remove("hidden");em.innerHTML=persons.length?"<h3>Nothing matches</h3><p>Try a different word or choose All.</p>":"<h3>Add the first person</h3><p>Use Add person to record a volunteer or team member.</p>"}
+  else em.classList.add("hidden");
+}
+function openPersonForm(p){
+  editingId=p?p.id:null;
+  $("#personHead").textContent=p?"Edit "+p.full_name:"Add a person";
+  $("#pe-cv").innerHTML='<option value="">No CV linked</option>'+docs.filter(isCV).map(d=>'<option value="'+esc(d.id)+'">'+esc(d.title)+"</option>").join("");
+  PFIELDS.forEach(([k,id])=>{$("#"+id).value=p&&p[k]!=null?p[k]:""});
+  if(!$("#pe-type").value)$("#pe-type").value="Volunteer";
+  if(!$("#pe-status").value)$("#pe-status").value="Active";
+  if(!p)$("#pe-date").value=new Date().toISOString().slice(0,10);
+  $("#pe-save").textContent=p?"Save changes":"Add person";
+  note("#personMsg","","");$("#personPanel").classList.remove("hidden");
+  $("#personPanel").scrollIntoView({block:"start",behavior:"smooth"});$("#pe-name").focus({preventScroll:true});
+}
+function closePersonForm(){$("#personPanel").classList.add("hidden");$("#f-person").reset();editingId=null}
+$("#b-addPerson").onclick=()=>openPersonForm(null);
+$("#pe-cancel").onclick=closePersonForm;
+$("#tq").addEventListener("input",renderTeam);
+$("#f-person").addEventListener("submit",async e=>{
+  e.preventDefault();note("#personMsg","","");
+  const r={};PFIELDS.forEach(([k,id])=>{const v=String($("#"+id).value).trim();r[k]=v===""?null:v});
+  if(!r.full_name)return note("#personMsg","err","Add the person's full name.");
+  if(/(^|\D)\d{13}(\D|$)/.test(Object.values(r).filter(Boolean).join(" ")))return note("#personMsg","err","That looks like an ID number. Please leave ID numbers out of this list.");
+  if(r.age!=null){r.age=parseInt(r.age,10);if(!(r.age>=10&&r.age<=120))return note("#personMsg","err","Check the age. It should be a number between 10 and 120.")}
+  const b=$("#pe-save"),wasEdit=!!editingId;busy(b,true,"Saving");
+  const res=wasEdit?await sb.from("people").update(r).eq("id",editingId):await sb.from("people").insert(r);
+  busy(b,false);
+  if(res.error)return note("#personMsg","err",needsSetup(res.error)?"This list needs a one-time setup step in Supabase first.":friendly(res.error));
+  closePersonForm();toast(wasEdit?"Changes saved":"Person added");loadTeam();
+});
+$("#teamList").addEventListener("click",async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.pd){const dl=document.getElementById("pd-"+b.dataset.pd);const open=dl.classList.contains("hidden");dl.classList.toggle("hidden",!open);b.setAttribute("aria-expanded",open);b.textContent=open?"Hide details":"Details";return}
+  if(b.dataset.cv){
+    const d=docs.find(x=>String(x.id)===b.dataset.cv);if(!d)return;
+    const w=window.open("","_blank");
+    const {data,error}=await sb.storage.from(BUCKET).createSignedUrl(d.storage_path,120);
+    if(error){if(w)w.close();return toast(friendly(error))}
+    if(w)w.location.href=data.signedUrl;else location.href=data.signedUrl;return;
+  }
+  const p=persons.find(x=>String(x.id)===(b.dataset.pe||b.dataset.px));if(!p)return;
+  if(b.dataset.pe)return openPersonForm(p);
+  if(!await confirmBox("Remove this person?",'"'+p.full_name+'" will be removed from the volunteers and team list. This cannot be undone.',"Remove"))return;
+  const {error}=await sb.from("people").delete().eq("id",p.id);
+  if(error)return toast(friendly(error));
+  toast("Person removed");loadTeam();
 });
 
 /* ---------- start ---------- */
