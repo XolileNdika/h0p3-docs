@@ -134,6 +134,7 @@ input[type=date],input[type=tel],input[type=number]{width:100%;padding:.7rem .85
 .pdl dd{margin:.15rem 0 0;overflow-wrap:anywhere;white-space:pre-line}
 .pdl .wide{grid-column:1/-1}
 .row-start{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center}
+.sub{font-size:1.15rem;margin:1.2rem 0 .7rem}
 
 /* footer */
 footer{background:var(--ink);color:#e9efe9;margin-top:auto}
@@ -261,6 +262,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         <button role="tab" id="tab-docs" aria-selected="true" type="button">Documents</button>
         <button role="tab" id="tab-cvs" aria-selected="false" type="button">CVs</button>
         <button role="tab" id="tab-team" aria-selected="false" type="button" class="hidden">Volunteers &amp; team</button>
+        <button role="tab" id="tab-cipc" aria-selected="false" type="button" class="hidden">CIPC compliance</button>
         <button role="tab" id="tab-people" aria-selected="false" type="button" class="hidden">Members<span class="badge hidden" id="pendBadge">0</span></button>
       </div>
 
@@ -326,6 +328,33 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         </div>
         <ul class="docs" id="teamList"></ul>
         <div id="teamEmpty" class="empty hidden"></div>
+      </div>
+
+      <div id="p-cipc" class="hidden">
+        <div class="page-head"><div><h2>CIPC compliance</h2><p id="cipcCount">Loading</p></div><button class="btn small" id="b-addCipc" type="button">Add item</button></div>
+        <p class="hint" style="margin:-.6rem 0 1.2rem">H0P3 Organization NPC · 2023/638945/08. Only the founder can see this tab.</p>
+
+        <div id="cipcPanel" class="panel hidden">
+          <h3 id="cipcHead">Add a CIPC item</h3>
+          <div id="cipcMsg" role="status"></div>
+          <form id="f-cipc" novalidate>
+            <div class="grid2">
+              <div class="field"><label for="ci-title">Document or filing</label><input id="ci-title" type="text" required placeholder="Annual return 2027"></div>
+              <div class="field"><label for="ci-status">Status</label><select id="ci-status"><option>Outstanding</option><option>In progress</option><option>On file</option></select></div>
+              <div class="field"><label for="ci-form">Form code (optional)</label><input id="ci-form" type="text" placeholder="CoR14.3"></div>
+              <div class="field"><label for="ci-track">Tracking number (optional)</label><input id="ci-track" type="text"></div>
+              <div class="field"><label for="ci-issued">Date issued</label><input id="ci-issued" type="date"></div>
+              <div class="field"><label for="ci-due">Due date</label><input id="ci-due" type="date"></div>
+            </div>
+            <div class="field"><label for="ci-use">What it is for, or what to do</label><input id="ci-use" type="text" placeholder="Banks, funders, proof H0P3 exists"></div>
+            <p class="hint">After saving, upload the PDF from the list.</p>
+            <div class="row-start"><button class="btn" type="submit" id="ci-save">Add item</button><button class="btn ghost" type="button" id="ci-cancel">Cancel</button></div>
+          </form>
+        </div>
+
+        <div id="cipcTodoWrap" class="hidden"><h3 class="sub">Outstanding</h3><ul class="docs" id="cipcTodo"></ul></div>
+        <div id="cipcDoneWrap" class="hidden"><h3 class="sub">On file</h3><ul class="docs" id="cipcDone"></ul></div>
+        <div id="cipcEmpty" class="empty hidden"><h3>Add your first CIPC item</h3><p>Use Add item, then upload its PDF.</p></div>
       </div>
 
       <div id="p-people" class="hidden">
@@ -477,15 +506,15 @@ function applyTabText(){
   note("#upMsg","","");
 }
 function setTab(t){
-  tab=t;["docs","cvs","team","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
-  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team");$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");
-  if(t==="people")loadPeople();else if(t==="team")loadTeam();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
+  tab=t;["docs","cvs","team","cipc","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
+  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team"||t==="cipc");$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");$("#p-cipc").classList.toggle("hidden",t!=="cipc");
+  if(t==="people")loadPeople();else if(t==="team")loadTeam();else if(t==="cipc")loadCipc();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
 }
-$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-people").onclick=()=>setTab("people");
+$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-people").onclick=()=>setTab("people");
 async function enterHome(){
   show("home");$("#whoEmail").textContent=me.full_name||me.email;
   const admin=!!me.is_admin;
-  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
+  $("#whoRole").classList.toggle("hidden",!admin);$("#tab-people").classList.toggle("hidden",!admin);$("#tab-team").classList.toggle("hidden",!admin);$("#tab-cipc").classList.toggle("hidden",!admin);$("#uploadPanel").classList.toggle("hidden",!admin);
   setTab("docs");await loadDocs();if(admin)refreshBadge();
 }
 
@@ -692,6 +721,99 @@ $("#teamList").addEventListener("click",async e=>{
   const {error}=await sb.from("people").delete().eq("id",p.id);
   if(error)return toast(friendly(error));
   toast("Person removed");loadTeam();
+});
+
+/* ---------- CIPC compliance (founder) ---------- */
+const CIPC_BUCKET="h0p3-cipc";
+let cipc=[], cipcEdit=null;
+const CF=[["title","ci-title"],["status","ci-status"],["form_code","ci-form"],["tracking_no","ci-track"],["issued_on","ci-issued"],["due_on","ci-due"],["used_for","ci-use"]];
+async function loadCipc(){
+  const {data,error}=await sb.from("cipc_items").select("*").order("sort_order",{ascending:true});
+  cipc=error?[]:(data||[]).slice().sort((a,b)=>(a.sort_order||0)-(b.sort_order||0)||String(a.title).localeCompare(String(b.title)));
+  renderCipc();
+  if(error)$("#cipcCount").textContent=/does not exist|schema cache|relation|cipc/i.test(error.message||"")?"This tab needs a one-time setup step in Supabase.":"Could not load. "+friendly(error);
+}
+function cipcRow(c){
+  const has=!!c.storage_path, out=c.status!=="On file";
+  const meta=[c.form_code,c.tracking_no?"Tracking "+c.tracking_no:"",c.issued_on?"Issued "+dateText(c.issued_on):"",c.due_on&&out?"Due "+dateText(c.due_on):"",has?sizeText(c.size_bytes||0):(out?"":"PDF not uploaded yet")].filter(Boolean).join(" · ");
+  const t=has?ftype(c.file_name||"file.pdf"):(out?{label:"TO DO",color:"var(--danger)"}:{label:"PDF",color:"#B9B4A4"});
+  return '<li class="doc"><div class="ftype" style="background:'+t.color+';font-size:'+(t.label.length>4?".72rem":".85rem")+'" aria-hidden="true">'+esc(t.label)+"</div>"+
+    "<div><h3>"+esc(c.title)+'<span class="pill '+(out?"pending":"approved")+'">'+esc(c.status||"Outstanding")+"</span></h3>"+
+    (c.used_for?'<p class="desc">'+esc(c.used_for)+"</p>":"")+(meta?'<p class="meta">'+esc(meta)+"</p>":"")+"</div>"+
+    '<div class="acts">'+(has?'<button class="btn small" data-co="'+esc(c.id)+'" type="button">Open</button><button class="btn ghost small" data-cd="'+esc(c.id)+'" type="button">Download</button>':"")+
+    '<label class="btn ghost small">'+(has?"Replace PDF":"Upload PDF")+'<input class="sr" type="file" accept="application/pdf,.pdf" data-cu="'+esc(c.id)+'" aria-label="'+(has?"Replace":"Upload")+" PDF for "+esc(c.title)+'"></label>'+
+    '<button class="btn ghost small" data-ce="'+esc(c.id)+'" type="button">Edit</button><button class="btn danger small" data-cx="'+esc(c.id)+'" type="button">Delete</button></div></li>';
+}
+function renderCipc(){
+  const todo=cipc.filter(c=>c.status!=="On file"), done=cipc.filter(c=>c.status==="On file"), pdfs=done.filter(c=>c.storage_path).length;
+  $("#cipcCount").textContent=cipc.length?(done.length+" on file ("+pdfs+" with a PDF) · "+todo.length+" outstanding"):"Nothing added yet";
+  $("#cipcTodo").innerHTML=todo.map(cipcRow).join("");
+  $("#cipcDone").innerHTML=done.map(cipcRow).join("");
+  $("#cipcTodoWrap").classList.toggle("hidden",!todo.length);
+  $("#cipcDoneWrap").classList.toggle("hidden",!done.length);
+  $("#cipcEmpty").classList.toggle("hidden",!!cipc.length);
+}
+function openCipcForm(c){
+  cipcEdit=c?c.id:null;
+  $("#cipcHead").textContent=c?"Edit "+c.title:"Add a CIPC item";
+  CF.forEach(([k,id])=>{$("#"+id).value=c&&c[k]!=null?c[k]:""});
+  if(!$("#ci-status").value)$("#ci-status").value="Outstanding";
+  $("#ci-save").textContent=c?"Save changes":"Add item";
+  note("#cipcMsg","","");$("#cipcPanel").classList.remove("hidden");
+  $("#cipcPanel").scrollIntoView({block:"start",behavior:"smooth"});$("#ci-title").focus({preventScroll:true});
+}
+function closeCipcForm(){$("#cipcPanel").classList.add("hidden");$("#f-cipc").reset();cipcEdit=null}
+async function putCipcFile(c,f){
+  if(!/\.pdf$/i.test(f.name)&&f.type!=="application/pdf")return "Choose a PDF file.";
+  if(f.size>MAX)return "That file is over 50 MB. Choose a smaller file.";
+  const safe=f.name.replace(/[^\w.\- ]+/g,"_").replace(/\s+/g,"_");
+  const path=c.id+"/"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2))+"-"+safe;
+  const up=await sb.storage.from(CIPC_BUCKET).upload(path,f,{contentType:"application/pdf",upsert:false});
+  if(up.error)return friendly(up.error);
+  const r=await sb.from("cipc_items").update({file_name:f.name,storage_path:path,size_bytes:f.size,status:"On file"}).eq("id",c.id);
+  if(r.error){await sb.storage.from(CIPC_BUCKET).remove([path]);return friendly(r.error)}
+  if(c.storage_path)await sb.storage.from(CIPC_BUCKET).remove([c.storage_path]);
+  return null;
+}
+$("#b-addCipc").onclick=()=>openCipcForm(null);
+$("#ci-cancel").onclick=closeCipcForm;
+$("#f-cipc").addEventListener("submit",async e=>{
+  e.preventDefault();note("#cipcMsg","","");
+  const r={};CF.forEach(([k,id])=>{const v=String($("#"+id).value).trim();r[k]=v===""?null:v});
+  if(!r.title)return note("#cipcMsg","err","Add a name for the document or filing.");
+  if(/(^|\D)\d{13}(\D|$)/.test(Object.values(r).filter(Boolean).join(" ")))return note("#cipcMsg","err","That looks like an ID number. Please leave ID numbers out.");
+  const b=$("#ci-save"),wasEdit=!!cipcEdit;busy(b,true,"Saving");
+  if(!wasEdit)r.sort_order=cipc.reduce((m,c)=>Math.max(m,c.sort_order||0),0)+10;
+  const res=wasEdit?await sb.from("cipc_items").update(r).eq("id",cipcEdit):await sb.from("cipc_items").insert(r);
+  busy(b,false);
+  if(res.error)return note("#cipcMsg","err",/does not exist|schema cache|relation|cipc/i.test(res.error.message||"")?"This tab needs a one-time setup step in Supabase first.":friendly(res.error));
+  closeCipcForm();toast(wasEdit?"Changes saved":"Item added");loadCipc();
+});
+$("#p-cipc").addEventListener("change",async e=>{
+  const inp=e.target.closest("input[data-cu]");if(!inp||!inp.files[0])return;
+  const c=cipc.find(x=>String(x.id)===inp.dataset.cu);if(!c)return;
+  const f=inp.files[0];toast("Uploading "+f.name);
+  const err=await putCipcFile(c,f);inp.value="";
+  if(err)return toast(err);
+  toast("PDF saved for "+c.title);loadCipc();
+});
+$("#p-cipc").addEventListener("click",async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const id=b.dataset.co||b.dataset.cd||b.dataset.ce||b.dataset.cx;if(!id)return;
+  const c=cipc.find(x=>String(x.id)===id);if(!c)return;
+  if(b.dataset.ce)return openCipcForm(c);
+  if(b.dataset.cx){
+    if(!await confirmBox("Delete this item?",'"'+c.title+'"'+(c.storage_path?" and its PDF":"")+" will be removed. This cannot be undone."))return;
+    if(c.storage_path){const r1=await sb.storage.from(CIPC_BUCKET).remove([c.storage_path]);if(r1.error)return toast(friendly(r1.error))}
+    const r2=await sb.from("cipc_items").delete().eq("id",c.id);
+    if(r2.error)return toast(friendly(r2.error));
+    toast("Item deleted");return loadCipc();
+  }
+  const dl=!!b.dataset.cd;let w=null;if(!dl)w=window.open("","_blank");
+  const {data,error}=await sb.storage.from(CIPC_BUCKET).createSignedUrl(c.storage_path,120,dl?{download:c.file_name}:undefined);
+  if(error){if(w)w.close();return toast(friendly(error))}
+  if(dl){const a=document.createElement("a");a.href=data.signedUrl;a.download=c.file_name;document.body.appendChild(a);a.click();a.remove()}
+  else if(w)w.location.href=data.signedUrl;else location.href=data.signedUrl;
 });
 
 /* ---------- start ---------- */
