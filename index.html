@@ -968,11 +968,16 @@ $("#f-fin").addEventListener("submit",async e=>{
 });
 
 /* ---------- start ---------- */
+let routedUid=null;
 sb.auth.onAuthStateChange((ev,session)=>{
   setTimeout(()=>{
     if(ev==="PASSWORD_RECOVERY"){show("recover");return}
     if(ev==="SIGNED_IN"||ev==="INITIAL_SESSION"||ev==="SIGNED_OUT"||ev==="USER_UPDATED"){
       if(!$("#v-recover").classList.contains("hidden")&&ev!=="SIGNED_OUT")return;
+      /* Supabase re-sends SIGNED_IN when the browser tab regains focus; stay on the current tab */
+      const uid=session?session.user.id:null;
+      if(ev==="SIGNED_IN"&&uid&&uid===routedUid&&!$("#v-home").classList.contains("hidden"))return;
+      routedUid=uid;
       route(session);
     }
   },0);
