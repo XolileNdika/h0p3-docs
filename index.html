@@ -122,6 +122,7 @@ textarea{min-height:84px;resize:vertical}
 .pill.approved{background:#2E916522;color:#1d6a47}
 .pill.pending{background:#A9C23A44;color:#59680f}
 .pill.blocked{background:#B3402F1F;color:#8c2f21}
+.pill.void{background:#8A857626;color:#5c584c}
 .pill.owner{background:#9B6EC833;color:#6a3f98}
 .pill.tag{background:#4FB6DE26;color:#1f6f8f}
 input[type=date],input[type=tel],input[type=number]{width:100%;padding:.7rem .85rem;border:2px solid var(--line);border-radius:10px;background:#fff;min-height:46px}
@@ -380,6 +381,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         <div class="tools"><div><label class="sr" for="wq">Search</label><input id="wq" type="search" placeholder="Search by title, category or notes"></div></div>
         <div id="workDraftWrap" class="hidden"><h3 class="sub">Drafts</h3><ul class="docs" id="workDrafts"></ul></div>
         <div id="workFinalWrap" class="hidden"><h3 class="sub">Finalised</h3><ul class="docs" id="workFinal"></ul></div>
+        <div id="workWdWrap" class="hidden"><h3 class="sub">Withdrawn</h3><p class="hint" style="margin:-.4rem 0 .8rem">No longer valid. Kept as a record; use Restore if one was withdrawn by mistake.</p><ul class="docs" id="workWd"></ul></div>
         <div id="workEmpty" class="empty hidden"></div>
       </div>
 
@@ -444,6 +446,10 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
   <div class="field"><label for="fin-file">Final version (optional)</label><input id="fin-file" type="file"><p class="hint">Add the signed or final copy if you have one. Leave it empty to keep the current file as the final version. The draft file is kept as a record.</p></div>
   <div id="finMsg" role="status"></div>
   <div class="row-end"><button class="btn ghost small" id="finNo" type="button">Cancel</button><button class="btn small" id="finYes" type="submit">Move to Finalised</button></div></form></dialog>
+<dialog id="wdDlg"><form id="f-wd" novalidate><h3>Withdraw this document?</h3><p id="wdWho" style="margin:0 0 1rem;color:var(--ink-soft)"></p>
+  <div class="field"><label for="wd-reason">Why is it no longer valid?</label><textarea id="wd-reason" placeholder="Withdrawn on 16 Nov 2026 after ..."></textarea><p class="hint">The document and its file are kept under Withdrawn as a record. You can restore it later.</p></div>
+  <div id="wdMsg" role="status"></div>
+  <div class="row-end"><button class="btn ghost small" id="wdNo" type="button">Cancel</button><button class="btn small" id="wdYes" type="submit">Withdraw</button></div></form></dialog>
 <div id="toast" class="hidden" role="status"></div>
 
 <script src="config.js"></script>
@@ -880,39 +886,45 @@ $("#p-cipc").addEventListener("click",async e=>{
 
 /* ---------- drafts and finalised (founder) ---------- */
 const WORK_BUCKET="h0p3-drafts";
-let work=[], finId=null;
+let work=[], finId=null, wdId=null;
+const isWd=w=>w.status==="withdrawn",isFin=w=>w.status==="final",isDraft=w=>!isWd(w)&&!isFin(w);
 const workSetup=e=>/does not exist|schema cache|relation|work_docs/i.test((e&&e.message)||"");
 const newPath=(id,name)=>id+"/"+(crypto.randomUUID?crypto.randomUUID():Date.now()+"-"+Math.random().toString(16).slice(2))+"-"+name.replace(/[^\w.\- ]+/g,"_").replace(/\s+/g,"_");
 async function loadWork(quiet){
   const {data,error}=await sb.from("work_docs").select("*").order("updated_at",{ascending:false});
   work=error?[]:(data||[]);
-  const n=work.filter(w=>w.status!=="final").length,b=$("#draftBadge");b.textContent=n;b.classList.toggle("hidden",!n);
+  const n=work.filter(isDraft).length,b=$("#draftBadge");b.textContent=n;b.classList.toggle("hidden",!n);
   if(quiet&&tab!=="work")return;
   renderWork();
   if(error)$("#workCount").textContent=workSetup(error)?"This tab needs a one-time setup step in Supabase.":"Could not load. "+friendly(error);
 }
 function workRow(w){
-  const fin=w.status==="final",t=ftype(w.file_name||"");
-  const meta=[w.category,w.size_bytes?sizeText(w.size_bytes):"",fin&&w.finalised_at?"Finalised "+dateText(w.finalised_at):"Updated "+dateText(w.updated_at||w.created_at)].filter(Boolean).join(" · ");
-  return '<li class="doc"><div class="ftype" style="background:'+t.color+'" aria-hidden="true">'+esc(t.label)+"</div>"+
-    "<div><h3>"+esc(w.title)+'<span class="pill '+(fin?"approved":"pending")+'">'+(fin?"Final":"Draft")+"</span></h3>"+
+  const fin=isFin(w),wd=isWd(w),t=ftype(w.file_name||"");
+  const meta=[w.category,w.size_bytes?sizeText(w.size_bytes):"",wd&&w.withdrawn_at?"Withdrawn "+dateText(w.withdrawn_at):fin&&w.finalised_at?"Finalised "+dateText(w.finalised_at):"Updated "+dateText(w.updated_at||w.created_at)].filter(Boolean).join(" · ");
+  const pill=wd?'<span class="pill void">Withdrawn</span>':'<span class="pill '+(fin?"approved":"pending")+'">'+(fin?"Final":"Draft")+"</span>";
+  const acts=wd?'<button class="btn ghost small" data-wrs="'+esc(w.id)+'" type="button">Restore</button>'
+    :fin?(w.draft_storage_path?'<button class="btn ghost small" data-wdo="'+esc(w.id)+'" type="button">Open draft</button>':"")+'<button class="btn ghost small" data-wr="'+esc(w.id)+'" type="button">Back to drafts</button><button class="btn ghost small" data-ww="'+esc(w.id)+'" type="button">Withdraw</button>'
+    :'<label class="btn ghost small">Replace file<input class="sr" type="file" data-wu="'+esc(w.id)+'" aria-label="Replace file for '+esc(w.title)+'"></label><button class="btn small" data-wf="'+esc(w.id)+'" type="button">Mark as final</button><button class="btn ghost small" data-ww="'+esc(w.id)+'" type="button">Withdraw</button>';
+  return '<li class="doc"'+(wd?' style="opacity:.85"':"")+'><div class="ftype" style="background:'+(wd?"#B9B4A4":t.color)+'" aria-hidden="true">'+esc(t.label)+"</div>"+
+    "<div><h3>"+esc(w.title)+pill+"</h3>"+
+    (wd&&w.withdrawn_reason?'<p class="desc"><b>Why withdrawn:</b> '+esc(w.withdrawn_reason)+"</p>":"")+
     (w.notes?'<p class="desc">'+esc(w.notes)+"</p>":"")+'<p class="meta">'+esc(meta)+"</p></div>"+
-    '<div class="acts"><button class="btn small" data-wo="'+esc(w.id)+'" type="button">Open</button><button class="btn ghost small" data-wd="'+esc(w.id)+'" type="button">Download</button>'+
-    (fin?(w.draft_storage_path?'<button class="btn ghost small" data-wdo="'+esc(w.id)+'" type="button">Open draft</button>':"")+'<button class="btn ghost small" data-wr="'+esc(w.id)+'" type="button">Back to drafts</button>'
-        :'<label class="btn ghost small">Replace file<input class="sr" type="file" data-wu="'+esc(w.id)+'" aria-label="Replace file for '+esc(w.title)+'"></label><button class="btn small" data-wf="'+esc(w.id)+'" type="button">Mark as final</button>')+
+    '<div class="acts"><button class="btn small" data-wo="'+esc(w.id)+'" type="button">Open</button><button class="btn ghost small" data-wd="'+esc(w.id)+'" type="button">Download</button>'+acts+
     '<button class="btn danger small" data-wx="'+esc(w.id)+'" type="button">Delete</button></div></li>';
 }
 function renderWork(){
   const q=$("#wq").value.trim().toLowerCase();
-  const hit=w=>!q||(w.title+" "+(w.category||"")+" "+(w.notes||"")).toLowerCase().includes(q);
-  const drafts=work.filter(w=>w.status!=="final"&&hit(w)),fins=work.filter(w=>w.status==="final"&&hit(w));
-  const nd=work.filter(w=>w.status!=="final").length,nf=work.length-nd;
-  $("#workCount").textContent=work.length?(nd+(nd===1?" draft":" drafts")+" · "+nf+" finalised"+(q?" · "+(drafts.length+fins.length)+" match":"")):"Nothing added yet";
+  const hit=w=>!q||(w.title+" "+(w.category||"")+" "+(w.notes||"")+" "+(w.withdrawn_reason||"")).toLowerCase().includes(q);
+  const drafts=work.filter(w=>isDraft(w)&&hit(w)),fins=work.filter(w=>isFin(w)&&hit(w)),wds=work.filter(w=>isWd(w)&&hit(w));
+  const nd=work.filter(isDraft).length,nf=work.filter(isFin).length,nw=work.filter(isWd).length;
+  $("#workCount").textContent=work.length?(nd+(nd===1?" draft":" drafts")+" · "+nf+" finalised"+(nw?" · "+nw+" withdrawn":"")+(q?" · "+(drafts.length+fins.length+wds.length)+" match":"")):"Nothing added yet";
   $("#workDrafts").innerHTML=drafts.map(workRow).join("");
   $("#workFinal").innerHTML=fins.map(workRow).join("");
+  $("#workWd").innerHTML=wds.map(workRow).join("");
   $("#workDraftWrap").classList.toggle("hidden",!drafts.length);
   $("#workFinalWrap").classList.toggle("hidden",!fins.length);
-  const em=$("#workEmpty"),none=!drafts.length&&!fins.length;em.classList.toggle("hidden",!none);
+  $("#workWdWrap").classList.toggle("hidden",!wds.length);
+  const em=$("#workEmpty"),none=!drafts.length&&!fins.length&&!wds.length;em.classList.toggle("hidden",!none);
   em.innerHTML=work.length?"<h3>Nothing matches</h3><p>Try a different word.</p>":"<h3>Add your first draft</h3><p>Use Add draft to save a document you are still working on. When it is done, mark it as final.</p>";
 }
 $("#wq").addEventListener("input",renderWork);
@@ -957,11 +969,19 @@ async function openWork(path,name,dl){
 }
 $("#p-work").addEventListener("click",async e=>{
   const b=e.target.closest("button");if(!b)return;
-  const d=b.dataset,id=d.wo||d.wd||d.wdo||d.wf||d.wr||d.wx;if(!id)return;
+  const d=b.dataset,id=d.wo||d.wd||d.wdo||d.wf||d.wr||d.ww||d.wrs||d.wx;if(!id)return;
   const w=work.find(x=>String(x.id)===id);if(!w)return;
   if(d.wo||d.wd){if(!w.storage_path)return toast("No file on this item yet.");return openWork(w.storage_path,w.file_name,!!d.wd)}
   if(d.wdo)return openWork(w.draft_storage_path,w.draft_file_name,false);
   if(d.wf){finId=w.id;$("#finWho").textContent=w.title;$("#f-fin").reset();note("#finMsg","","");$("#finDlg").showModal();return}
+  if(d.ww){wdId=w.id;$("#wdWho").textContent=w.title;$("#f-wd").reset();note("#wdMsg","","");$("#wdDlg").showModal();$("#wd-reason").focus();return}
+  if(d.wrs){
+    const to=w.finalised_at?"final":"draft";
+    if(!await confirmBox("Restore this document?",'"'+w.title+'" will move back to '+(to==="final"?"Finalised":"Drafts")+".","Restore"))return;
+    const r=await sb.from("work_docs").update({status:to,withdrawn_at:null,withdrawn_reason:null,updated_at:new Date().toISOString()}).eq("id",w.id);
+    if(r.error)return toast(friendly(r.error));
+    toast("Restored to "+(to==="final"?"Finalised":"Drafts"));return loadWork();
+  }
   if(d.wr){
     if(!await confirmBox("Move back to Drafts?",'"'+w.title+'" will move back to Drafts so you can keep working on it.',"Move back"))return;
     const r=await sb.from("work_docs").update({status:"draft",finalised_at:null,updated_at:new Date().toISOString()}).eq("id",w.id);
@@ -978,6 +998,18 @@ $("#p-work").addEventListener("click",async e=>{
   }
 });
 $("#finNo").onclick=()=>$("#finDlg").close();
+$("#wdNo").onclick=()=>$("#wdDlg").close();
+$("#f-wd").addEventListener("submit",async e=>{
+  e.preventDefault();note("#wdMsg","","");
+  const w=work.find(x=>String(x.id)===String(wdId));if(!w)return $("#wdDlg").close();
+  const reason=$("#wd-reason").value.trim();
+  if(!reason)return note("#wdMsg","err","Add a short reason so the record is clear later.");
+  const b=$("#wdYes");busy(b,true,"Saving");
+  const r=await sb.from("work_docs").update({status:"withdrawn",withdrawn_at:new Date().toISOString(),withdrawn_reason:reason,updated_at:new Date().toISOString()}).eq("id",w.id);
+  busy(b,false);
+  if(r.error)return note("#wdMsg","err",/withdrawn|check constraint|column/i.test(r.error.message||"")?"Withdraw needs a one-time setup step in Supabase first.":friendly(r.error));
+  $("#wdDlg").close();toast("Moved to Withdrawn");loadWork();
+});
 $("#f-fin").addEventListener("submit",async e=>{
   e.preventDefault();note("#finMsg","","");
   const w=work.find(x=>String(x.id)===String(finId));if(!w)return $("#finDlg").close();
