@@ -261,6 +261,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
       <div class="tabs" role="tablist" id="mainTabs">
         <button role="tab" id="tab-docs" aria-selected="true" type="button">Documents</button>
         <button role="tab" id="tab-cvs" aria-selected="false" type="button">CVs</button>
+        <button role="tab" id="tab-vac" aria-selected="false" type="button">Vacancies</button>
         <button role="tab" id="tab-team" aria-selected="false" type="button" class="hidden">Volunteers &amp; team</button>
         <button role="tab" id="tab-cipc" aria-selected="false" type="button" class="hidden">CIPC compliance</button>
         <button role="tab" id="tab-work" aria-selected="false" type="button" class="hidden">Drafts &amp; finalised<span class="badge hidden" id="draftBadge">0</span></button>
@@ -380,6 +381,37 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
         <div id="workDraftWrap" class="hidden"><h3 class="sub">Drafts</h3><ul class="docs" id="workDrafts"></ul></div>
         <div id="workFinalWrap" class="hidden"><h3 class="sub">Finalised</h3><ul class="docs" id="workFinal"></ul></div>
         <div id="workEmpty" class="empty hidden"></div>
+      </div>
+
+      <div id="p-vac" class="hidden">
+        <div class="page-head"><div><h2>Vacancies</h2><p id="vacCount">Loading</p></div><button class="btn small hidden" id="b-addVac" type="button">Add vacancy</button></div>
+        <p class="hint" id="vacHint" style="margin:-.6rem 0 1.2rem">Open roles at h0p3. A vacancy moves to Closed when the founder closes it or its closing date has passed.</p>
+
+        <div id="vacPanel" class="panel hidden">
+          <h3 id="vacHead">Add a vacancy</h3>
+          <div id="vacMsg" role="status"></div>
+          <form id="f-vac" novalidate>
+            <div class="grid2">
+              <div class="field"><label for="va-title">Role title</label><input id="va-title" type="text" required placeholder="Volunteer Coordinator"></div>
+              <div class="field"><label for="va-type">Type</label><select id="va-type"><option>Volunteer</option><option>Team</option><option>Internship</option><option>Contract</option></select></div>
+              <div class="field"><label for="va-project">Initiative or project (optional)</label><input id="va-project" type="text" placeholder="Pads Donation"></div>
+              <div class="field"><label for="va-loc">Location</label><input id="va-loc" type="text" placeholder="Johannesburg or remote"></div>
+              <div class="field"><label for="va-pos">Number of positions</label><input id="va-pos" type="number" min="1" max="999" placeholder="1"></div>
+              <div class="field"><label for="va-status">Status</label><select id="va-status"><option>Open</option><option>Closed</option></select></div>
+              <div class="field"><label for="va-posted">Date posted</label><input id="va-posted" type="date"></div>
+              <div class="field"><label for="va-closes">Closing date (optional)</label><input id="va-closes" type="date"></div>
+            </div>
+            <div class="field"><label for="va-desc">What the role involves</label><textarea id="va-desc"></textarea></div>
+            <div class="field"><label for="va-req">Requirements</label><textarea id="va-req" placeholder="Skills, availability, anything people need"></textarea></div>
+            <div class="field"><label for="va-apply">How to apply</label><textarea id="va-apply" placeholder="Email your CV to info@h0p3.org with the role title in the subject"></textarea></div>
+            <div class="row-start"><button class="btn" type="submit" id="va-save">Add vacancy</button><button class="btn ghost" type="button" id="va-cancel">Cancel</button></div>
+          </form>
+        </div>
+
+        <div class="tools"><div><label class="sr" for="vq">Search vacancies</label><input id="vq" type="search" placeholder="Search by role, type, project or location"></div></div>
+        <div id="vacOpenWrap" class="hidden"><h3 class="sub">Open</h3><ul class="docs" id="vacOpen"></ul></div>
+        <div id="vacClosedWrap" class="hidden"><h3 class="sub">Closed</h3><ul class="docs" id="vacClosed"></ul></div>
+        <div id="vacEmpty" class="empty hidden"></div>
       </div>
 
       <div id="p-people" class="hidden">
@@ -535,12 +567,12 @@ function applyTabText(){
   note("#upMsg","","");
 }
 function setTab(t){
-  tab=t;["docs","cvs","team","cipc","work","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
+  tab=t;["docs","cvs","vac","team","cipc","work","people"].forEach(n=>$("#tab-"+n).setAttribute("aria-selected",t===n));
   const work=t==="work";$("#p-work").classList.toggle("hidden",!work);
-  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team"||t==="cipc"||work);$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");$("#p-cipc").classList.toggle("hidden",t!=="cipc");
-  if(t==="people")loadPeople();else if(t==="team")loadTeam();else if(t==="cipc")loadCipc();else if(work)loadWork();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
+  $("#p-docs").classList.toggle("hidden",t==="people"||t==="team"||t==="cipc"||t==="vac"||work);$("#p-vac").classList.toggle("hidden",t!=="vac");$("#p-people").classList.toggle("hidden",t!=="people");$("#p-team").classList.toggle("hidden",t!=="team");$("#p-cipc").classList.toggle("hidden",t!=="cipc");
+  if(t==="people")loadPeople();else if(t==="team")loadTeam();else if(t==="cipc")loadCipc();else if(work)loadWork();else if(t==="vac")loadVac();else{cat="All";$("#q").value="";applyTabText();renderDocs()}
 }
-$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-work").onclick=()=>setTab("work");$("#tab-people").onclick=()=>setTab("people");
+$("#tab-docs").onclick=()=>setTab("docs");$("#tab-cvs").onclick=()=>setTab("cvs");$("#tab-vac").onclick=()=>setTab("vac");$("#tab-team").onclick=()=>setTab("team");$("#tab-cipc").onclick=()=>setTab("cipc");$("#tab-work").onclick=()=>setTab("work");$("#tab-people").onclick=()=>setTab("people");
 async function enterHome(){
   show("home");$("#whoEmail").textContent=me.full_name||me.email;
   const admin=!!me.is_admin;
@@ -965,6 +997,99 @@ $("#f-fin").addEventListener("submit",async e=>{
   if(res.error){if(path)await sb.storage.from(WORK_BUCKET).remove([path]);return note("#finMsg","err",friendly(res.error))}
   if(f&&w.draft_storage_path)await sb.storage.from(WORK_BUCKET).remove([w.draft_storage_path]);
   $("#finDlg").close();toast("Moved to Finalised");loadWork();
+});
+
+/* ---------- vacancies (everyone reads, founder manages) ---------- */
+let vacs=[], vacEdit=null;
+const VF=[["title","va-title"],["vac_type","va-type"],["project","va-project"],["location","va-loc"],["positions","va-pos"],["status","va-status"],["posted_on","va-posted"],["closes_on","va-closes"],["description","va-desc"],["requirements","va-req"],["how_to_apply","va-apply"]];
+const todayISO=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const vacClosed=v=>v.status==="Closed"||(!!v.closes_on&&v.closes_on<todayISO());
+const vacSetup=e=>/does not exist|schema cache|relation|vacancies/i.test((e&&e.message)||"");
+async function loadVac(){
+  const {data,error}=await sb.from("vacancies").select("*").order("posted_on",{ascending:false});
+  vacs=error?[]:(data||[]).slice().sort((a,b)=>String(b.posted_on||b.created_at||"").localeCompare(String(a.posted_on||a.created_at||"")));
+  renderVac();
+  if(error)$("#vacCount").textContent=vacSetup(error)?"This tab needs a one-time setup step in Supabase.":"Could not load. "+friendly(error);
+}
+function vacRow(v){
+  const admin=!!(me&&me.is_admin),closed=vacClosed(v),late=closed&&v.status!=="Closed";
+  const row=(k,x,wide)=>(x||x===0)?'<div'+(wide?' class="wide"':"")+"><dt>"+k+"</dt><dd>"+esc(x)+"</dd></div>":"";
+  const meta=[v.location,v.positions?v.positions+(Number(v.positions)===1?" position":" positions"):"",v.posted_on?"Posted "+dateText(v.posted_on):"",v.closes_on?(late||!closed?"Closes ":"Closed ")+dateText(v.closes_on):(closed?"":"No closing date")].filter(Boolean).join(" · ");
+  return '<li class="doc"><div class="ftype" style="background:'+(closed?"#B9B4A4":"var(--green)")+';font-size:.72rem" aria-hidden="true">'+(closed?"CLOSED":"OPEN")+"</div>"+
+    "<div><h3>"+esc(v.title)+'<span class="pill '+(v.vac_type==="Volunteer"?"vol":"team")+'">'+esc(v.vac_type||"Volunteer")+"</span></h3>"+
+    (v.project?'<p class="desc">'+esc(v.project)+"</p>":"")+'<p class="meta">'+esc(meta)+(late?" · closing date passed":"")+"</p></div>"+
+    '<div class="acts"><button class="btn small" data-vd="'+esc(v.id)+'" aria-expanded="false" type="button">Details</button>'+
+    (admin?'<button class="btn ghost small" data-ve="'+esc(v.id)+'" type="button">Edit</button>'+
+      (v.status==="Closed"?'<button class="btn ghost small" data-vr="'+esc(v.id)+'" type="button">Reopen</button>':'<button class="btn ghost small" data-vc="'+esc(v.id)+'" type="button">Close</button>')+
+      '<button class="btn danger small" data-vx="'+esc(v.id)+'" type="button">Delete</button>':"")+"</div>"+
+    '<dl class="pdl hidden" id="vd-'+esc(v.id)+'">'+
+      row("Role",v.title)+row("Type",v.vac_type)+row("Initiative or project",v.project)+row("Location",v.location)+row("Positions",v.positions)+row("Status",closed?"Closed":"Open")+
+      row("Date posted",v.posted_on?dateText(v.posted_on):"")+row("Closing date",v.closes_on?dateText(v.closes_on):"")+
+      row("What the role involves",v.description,1)+row("Requirements",v.requirements,1)+row("How to apply",v.how_to_apply,1)+
+    "</dl></li>";
+}
+function renderVac(){
+  const admin=!!(me&&me.is_admin);
+  $("#b-addVac").classList.toggle("hidden",!admin);if(!admin)$("#vacPanel").classList.add("hidden");
+  const q=$("#vq").value.trim().toLowerCase();
+  const hit=v=>!q||[v.title,v.vac_type,v.project,v.location].join(" ").toLowerCase().includes(q);
+  const open=vacs.filter(v=>!vacClosed(v)&&hit(v)),closed=vacs.filter(v=>vacClosed(v)&&hit(v));
+  const no=vacs.filter(v=>!vacClosed(v)).length,nc=vacs.length-no;
+  $("#vacCount").textContent=vacs.length?(no+" open · "+nc+" closed"+(q?" · "+(open.length+closed.length)+" match":"")):"No vacancies yet";
+  $("#vacOpen").innerHTML=open.map(vacRow).join("");
+  $("#vacClosed").innerHTML=closed.map(vacRow).join("");
+  $("#vacOpenWrap").classList.toggle("hidden",!open.length);
+  $("#vacClosedWrap").classList.toggle("hidden",!closed.length);
+  const em=$("#vacEmpty");em.classList.toggle("hidden",!!(open.length||closed.length));
+  em.innerHTML=vacs.length?"<h3>Nothing matches</h3><p>Try a different word.</p>":admin?"<h3>Add your first vacancy</h3><p>Use Add vacancy to post a role.</p>":"<h3>No vacancies right now</h3><p>Check back soon.</p>";
+}
+function openVacForm(v){
+  vacEdit=v?v.id:null;
+  $("#vacHead").textContent=v?"Edit "+v.title:"Add a vacancy";
+  VF.forEach(([k,id])=>{$("#"+id).value=v&&v[k]!=null?v[k]:""});
+  if(!$("#va-type").value)$("#va-type").value="Volunteer";
+  if(!$("#va-status").value)$("#va-status").value="Open";
+  if(!v)$("#va-posted").value=todayISO();
+  $("#va-save").textContent=v?"Save changes":"Add vacancy";
+  note("#vacMsg","","");$("#vacPanel").classList.remove("hidden");
+  $("#vacPanel").scrollIntoView({block:"start",behavior:"smooth"});$("#va-title").focus({preventScroll:true});
+}
+function closeVacForm(){$("#vacPanel").classList.add("hidden");$("#f-vac").reset();vacEdit=null}
+$("#b-addVac").onclick=()=>openVacForm(null);
+$("#va-cancel").onclick=closeVacForm;
+$("#vq").addEventListener("input",renderVac);
+$("#f-vac").addEventListener("submit",async e=>{
+  e.preventDefault();note("#vacMsg","","");
+  const r={};VF.forEach(([k,id])=>{const x=String($("#"+id).value).trim();r[k]=x===""?null:x});
+  if(!r.title)return note("#vacMsg","err","Add a role title.");
+  if(r.positions!=null){const n=parseInt(r.positions,10);if(!(n>0))return note("#vacMsg","err","Number of positions must be 1 or more.");r.positions=n}
+  if(r.closes_on&&r.posted_on&&r.closes_on<r.posted_on)return note("#vacMsg","err","The closing date is before the date posted.");
+  r.status=r.status||"Open";r.updated_at=new Date().toISOString();
+  const b=$("#va-save"),wasEdit=!!vacEdit;busy(b,true,"Saving");
+  const res=wasEdit?await sb.from("vacancies").update(r).eq("id",vacEdit):await sb.from("vacancies").insert(r);
+  busy(b,false);
+  if(res.error)return note("#vacMsg","err",vacSetup(res.error)?"This tab needs a one-time setup step in Supabase first.":friendly(res.error));
+  closeVacForm();toast(wasEdit?"Changes saved":"Vacancy added");loadVac();
+});
+$("#p-vac").addEventListener("click",async e=>{
+  const b=e.target.closest("button");if(!b)return;
+  const d=b.dataset,id=d.vd||d.ve||d.vc||d.vr||d.vx;if(!id)return;
+  const v=vacs.find(x=>String(x.id)===id);if(!v)return;
+  if(d.vd){const dl=$("#vd-"+CSS.escape(id)),open=dl.classList.toggle("hidden");b.setAttribute("aria-expanded",String(!open));b.textContent=open?"Details":"Hide details";return}
+  if(d.ve)return openVacForm(v);
+  if(d.vc||d.vr){
+    const closing=!!d.vc;
+    if(!closing&&v.closes_on&&v.closes_on<todayISO())return toast("Change the closing date first: use Edit.");
+    const r1=await sb.from("vacancies").update({status:closing?"Closed":"Open",updated_at:new Date().toISOString()}).eq("id",v.id);
+    if(r1.error)return toast(friendly(r1.error));
+    toast(closing?"Vacancy closed":"Vacancy reopened");return loadVac();
+  }
+  if(d.vx){
+    if(!await confirmBox("Delete this vacancy?",'"'+v.title+'" will be removed. This cannot be undone. To keep a record, use Close instead.'))return;
+    const r2=await sb.from("vacancies").delete().eq("id",v.id);
+    if(r2.error)return toast(friendly(r2.error));
+    toast("Vacancy deleted");return loadVac();
+  }
 });
 
 /* ---------- start ---------- */
