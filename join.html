@@ -59,11 +59,9 @@ footer{margin-top:2rem;color:var(--ink-soft);font-size:.88rem;text-align:center}
         <div class="field"><label for="email">Email address <span class="req">*</span></label><input id="email" type="email" autocomplete="email" required></div>
         <div class="field"><label for="phone">Phone / WhatsApp</label><input id="phone" type="tel" autocomplete="tel"></div>
         <div class="field"><label for="area">Area / suburb</label><input id="area" type="text" autocomplete="address-level2"></div>
-        <div class="field"><label for="age">Age</label><input id="age" type="number" min="10" max="120" inputmode="numeric"></div>
         <div class="field"><label for="role">Role or position</label><input id="role" type="text" value="Assigned by the founder" disabled aria-describedby="roleHint"><p class="hint" id="roleHint">Only the founder can set your role.</p></div>
       </div>
       <div class="field"><label for="avail">When are you available?</label><input id="avail" type="text" placeholder="Saturdays, weekday evenings"></div>
-      <div class="field"><label for="why">Why did you join h0p3?</label><textarea id="why"></textarea></div>
       <div class="trap" aria-hidden="true"><label for="website">Leave this empty</label><input id="website" type="text" tabindex="-1" autocomplete="off"></div>
       <p class="hint" style="margin:0 0 1rem">Please don't include your ID number anywhere on this form.</p>
       <button class="btn" type="submit" id="send">Send my details</button>
@@ -88,11 +86,10 @@ $("#f").addEventListener("submit",async e=>{
   e.preventDefault();err("");
   if($("#website").value)return;
   const v=id=>$("#"+id).value.trim()||null;
-  const r={full_name:v("name"),email:v("email"),phone:v("phone"),area:v("area"),age:v("age"),availability:v("avail"),motivation:v("why"),
+  const r={full_name:v("name"),email:v("email"),phone:v("phone"),area:v("area"),availability:v("avail"),
     joined_as:"Team",status:"New from form",joined_on:new Date().toISOString().slice(0,10)};
   if(!r.full_name)return err("Please add your full name.");
   if(!r.email||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email))return err("Please add a valid email address.");
-  if(r.age!=null){r.age=parseInt(r.age,10);if(!(r.age>=10&&r.age<=120))return err("Please check your age.")}
   if(/(^|\D)\d{13}(\D|$)/.test(Object.values(r).filter(Boolean).join(" ")))return err("That looks like an ID number. Please leave ID numbers out.");
   const b=$("#send");b.disabled=true;b.textContent="Sending";
   const {error}=await sb.from("people").insert(r);
