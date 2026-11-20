@@ -300,7 +300,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
       </div>
 
       <div id="p-team" class="hidden">
-        <div class="page-head"><div><h2>Volunteers &amp; team</h2><p id="teamCount">Loading</p></div><button class="btn small" id="b-addPerson" type="button">Add person</button></div>
+        <div class="page-head"><div><h2>Volunteers &amp; team</h2><p id="teamCount">Loading</p></div><div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn small ghost" id="b-copyJoin" type="button">Copy team form link</button><button class="btn small" id="b-addPerson" type="button">Add person</button></div></div>
 
         <div id="personPanel" class="panel hidden">
           <h3 id="personHead">Add a person</h3>
@@ -315,7 +315,7 @@ dialog .row-end{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1.2re
               <div class="field"><label for="pe-phone">Phone / WhatsApp</label><input id="pe-phone" type="tel" autocomplete="off"></div>
               <div class="field"><label for="pe-area">Area / suburb</label><input id="pe-area" type="text"></div>
               <div class="field"><label for="pe-age">Age</label><input id="pe-age" type="number" min="10" max="120"></div>
-              <div class="field"><label for="pe-status">Status</label><select id="pe-status"><option>Active</option><option>On hold</option><option>Left</option></select></div>
+              <div class="field"><label for="pe-status">Status</label><select id="pe-status"><option>Active</option><option>On hold</option><option>Left</option><option>New from form</option></select></div>
               <div class="field"><label for="pe-cv">CV (from the CVs tab)</label><select id="pe-cv"></select></div>
             </div>
             <div class="field"><label for="pe-avail">Availability</label><input id="pe-avail" type="text" placeholder="Saturdays, weekday evenings"></div>
@@ -759,6 +759,7 @@ function openPersonForm(p){
 }
 function closePersonForm(){$("#personPanel").classList.add("hidden");$("#f-person").reset();editingId=null}
 $("#b-addPerson").onclick=()=>openPersonForm(null);
+$("#b-copyJoin").onclick=async()=>{const u=location.origin+"/join.html";try{await navigator.clipboard.writeText(u);toast("Link copied: "+u)}catch(_){prompt("Copy this link",u)}};
 $("#pe-cancel").onclick=closePersonForm;
 $("#tq").addEventListener("input",renderTeam);
 $("#f-person").addEventListener("submit",async e=>{
